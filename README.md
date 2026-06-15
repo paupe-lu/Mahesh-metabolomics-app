@@ -1,6 +1,10 @@
 # Diet x Microbiota Metabolomics Explorer
 
-Streamlit dashboard for exploring cecal metabolomics data from diet and microbiota experiments.
+Streamlit dashboard for exploring cecal metabolomics data from diet and microbiota experiments from: 
+
+Desai M, Seekatz A, Koropatkin N ...
+A Dietary Fiber-Deprived Gut Microbiota Degrades the Colonic Mucus Barrier and Enhances Pathogen Susceptibility
+Cell, 167, 1339-1353.e21
 
 ## What The App Does
 
@@ -8,7 +12,7 @@ Streamlit dashboard for exploring cecal metabolomics data from diet and microbio
 - Supports the `GF_14SM` and `SPF_diet` sheets.
 - Shows PCA, metabolite boxplots, heatmaps, volcano plots, microbiota effects, and diet effects.
 - Uses `nmol/g` units when detected from the workbook.
-- Drops SPF samples marked as `outlier`.
+- Drops SPF sample marked as `outlier` by publication.
 
 ## Run Locally
 
