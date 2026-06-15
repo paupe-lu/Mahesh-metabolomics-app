@@ -363,7 +363,7 @@ with tab1:
     fig.update_xaxes(title=f"PC1 ({pca.explained_variance_ratio_[0] * 100:.1f}%)")
     fig.update_yaxes(title=f"PC2 ({pca.explained_variance_ratio_[1] * 100:.1f}%)")
 
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
 with tab2:
     if filtered_meta.empty:
@@ -385,7 +385,7 @@ with tab2:
         fig.update_traces(pointpos=0, jitter=0.25)
         fig.update_layout(yaxis_title=unit)
 
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
 with tab3:
     if filtered_meta.empty:
@@ -397,7 +397,11 @@ with tab3:
         if heatmap_log_transform:
             heat_matrix = np.log10(heat_matrix + 1)
 
-        if use_all_heatmap_metabolites:
+        if len(heat_samples) < 2:
+            st.warning("Select at least two samples for the heatmap.")
+        elif heat_matrix.dropna(how="all").empty:
+            st.warning("No metabolite values are available for the selected samples.")
+        elif use_all_heatmap_metabolites:
             displayed_metabolites = heat_matrix.index
             heatmap_title = "All metabolites"
         else:
@@ -405,33 +409,34 @@ with tab3:
             displayed_metabolites = variances.head(heatmap_top_n).index
             heatmap_title = f"Top {len(displayed_metabolites)} variable metabolites"
 
-        heat = heat_matrix.loc[displayed_metabolites]
-        heat_z = heat.sub(heat.mean(axis=1), axis=0).div(heat.std(axis=1), axis=0)
-        heat_z = heat_z.replace([np.inf, -np.inf], np.nan).fillna(0)
-        color_limit = float(np.nanmax(np.abs(heat_z.to_numpy())))
-        if color_limit == 0 or np.isnan(color_limit):
-            color_limit = 1.0
+        if len(heat_samples) >= 2 and not heat_matrix.dropna(how="all").empty:
+            heat = heat_matrix.loc[displayed_metabolites]
+            heat_z = heat.sub(heat.mean(axis=1), axis=0).div(heat.std(axis=1), axis=0)
+            heat_z = heat_z.replace([np.inf, -np.inf], np.nan).fillna(0)
+            color_limit = float(np.nanmax(np.abs(heat_z.to_numpy())))
+            if color_limit == 0 or np.isnan(color_limit):
+                color_limit = 1.0
 
-        sample_labels = filtered_meta.set_index("Sample").loc[heat_samples].apply(
-            lambda r: f"{r.name} | {r['Group']}",
-            axis=1,
-        )
-        heat_z.columns = sample_labels.tolist()
+            sample_labels = filtered_meta.set_index("Sample").loc[heat_samples].apply(
+                lambda r: f"{r.name} | {r['Group']}",
+                axis=1,
+            )
+            heat_z.columns = sample_labels.tolist()
 
-        fig = px.imshow(
-            heat_z,
-            aspect="auto",
-            color_continuous_scale="RdBu_r",
-            zmin=-color_limit,
-            zmax=color_limit,
-            color_continuous_midpoint=0,
-            labels={"x": "Sample", "y": "Metabolite", "color": "Row z-score"},
-            title=heatmap_title,
-        )
-        fig.update_layout(height=850)
+            fig = px.imshow(
+                heat_z,
+                aspect="auto",
+                color_continuous_scale="RdBu_r",
+                zmin=-color_limit,
+                zmax=color_limit,
+                color_continuous_midpoint=0,
+                labels={"x": "Sample", "y": "Metabolite", "color": "Row z-score"},
+                title=heatmap_title,
+            )
+            fig.update_layout(height=850)
 
-        st.plotly_chart(fig, use_container_width=True)
-        st.dataframe(heat_z, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
+            st.dataframe(heat_z, width="stretch")
 
 with tab4:
     if selected_experiment == "GF / 14SM":
@@ -478,10 +483,10 @@ with tab4:
     fig.add_vline(x=LOG2FC_THRESHOLD, line_dash="dash", line_color="gray")
     fig.add_hline(y=-np.log10(SIGNIFICANCE_Q), line_dash="dash", line_color="gray")
 
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
     st.dataframe(
         vol.sort_values(["q", "p"], na_position="last"),
-        use_container_width=True,
+        width="stretch",
     )
     st.download_button(
         "Download volcano results",
@@ -530,7 +535,7 @@ with tab5:
 
         st.dataframe(
             eff.sort_values("SC1_log2FC", ascending=False),
-            use_container_width=True,
+            width="stretch",
         )
         st.download_button(
             "Download microbiota effects",
@@ -609,18 +614,18 @@ with tab6:
         fig.add_hline(y=-LOG2FC_THRESHOLD, line_dash="dash", line_color="gray")
         fig.add_hline(y=LOG2FC_THRESHOLD, line_dash="dash", line_color="gray")
 
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
         st.dataframe(
             eff["Diet_response"].value_counts().reindex(response_order, fill_value=0)
             .rename_axis("Diet response")
             .reset_index(name="Metabolites"),
-            use_container_width=True,
+            width="stretch",
         )
 
         st.dataframe(
             eff.sort_values(["Diet_response", "GF_q", "14SM_q"], na_position="last"),
-            use_container_width=True,
+            width="stretch",
         )
         st.download_button(
             "Download diet effects",
@@ -669,10 +674,10 @@ with tab6:
             fig.add_vline(x=LOG2FC_THRESHOLD, line_dash="dash", line_color="gray")
             fig.add_hline(y=-np.log10(SIGNIFICANCE_Q), line_dash="dash", line_color="gray")
 
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
             st.dataframe(
                 eff.sort_values(["q", "p"], na_position="last"),
-                use_container_width=True,
+                width="stretch",
             )
             st.download_button(
                 "Download SPF diet effects",
