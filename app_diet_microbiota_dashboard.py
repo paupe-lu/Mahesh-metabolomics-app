@@ -130,6 +130,12 @@ def default_workbook():
     return None
 
 
+def workbook_label(workbook):
+    if isinstance(workbook, Path):
+        return workbook.name
+    return getattr(workbook, "name", "uploaded workbook")
+
+
 def clean_sample_name(value):
     return str(value).replace("\r", " ").replace("\n", " ").strip()
 
@@ -265,25 +271,48 @@ def filter_metadata(metadata, colonization, diet):
     return filtered
 
 
-st.set_page_config(page_title=APP_TITLE, layout="wide")
+st.set_page_config(
+    page_title=APP_TITLE,
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
 st.title(APP_TITLE)
 
-uploaded = st.sidebar.file_uploader("Upload metabolomics Excel file", type=["xlsx"])
+st.sidebar.title("Data")
+st.sidebar.caption("A bundled workbook is loaded automatically. Upload another Excel file to override it.")
+uploaded = st.sidebar.file_uploader(
+    "Workbook",
+    type=["xlsx"],
+    help="Upload a Mahesh metabolomics .xlsx workbook to replace the bundled file.",
+)
 
 if uploaded is not None:
     workbook = uploaded
-    st.sidebar.success("Using uploaded workbook.")
-elif default_workbook() is not None:
-    workbook = default_workbook()
-    st.sidebar.info(f"Using bundled workbook: {workbook.name}")
+    st.sidebar.success(f"Using uploaded workbook: {workbook_label(workbook)}")
 else:
+    workbook = default_workbook()
+
+if workbook is None:
     st.info("Upload the Mahesh metabolomics Excel file.")
     st.stop()
+elif uploaded is None:
+    st.sidebar.info(f"Auto-loaded workbook: {workbook_label(workbook)}")
 
-experiments = available_experiments(workbook)
+try:
+    experiments = available_experiments(workbook)
+except Exception as exc:
+    st.error(f"Could not read workbook '{workbook_label(workbook)}'.")
+    st.exception(exc)
+    st.stop()
+
 selected_experiment = st.sidebar.selectbox("Experiment", experiments)
 
-raw, meta, met, sample_names, unit = load_experiment(workbook, selected_experiment)
+try:
+    raw, meta, met, sample_names, unit = load_experiment(workbook, selected_experiment)
+except Exception as exc:
+    st.error(f"Could not load the '{selected_experiment}' experiment from '{workbook_label(workbook)}'.")
+    st.exception(exc)
+    st.stop()
 groups_order = GF_14SM_GROUPS_ORDER if selected_experiment == "GF / 14SM" else SPF_GROUPS_ORDER
 colonization_order = (
     GF_14SM_COLONIZATION_ORDER
