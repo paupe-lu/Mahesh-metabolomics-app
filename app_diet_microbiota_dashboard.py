@@ -1,12 +1,10 @@
+from io import BytesIO
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import plotly.express as px
 import streamlit as st
-from scipy.stats import ttest_ind
-from sklearn.decomposition import PCA
-from sklearn.preprocessing import StandardScaler
 
 
 APP_TITLE = "Diet x Microbiota Metabolomics Explorer"
@@ -63,6 +61,8 @@ def log2_fold_change(row, metadata, group_b, group_a):
 
 
 def welch_p_value(row, metadata, group_b, group_a):
+    from scipy.stats import ttest_ind
+
     b = group_values(row, metadata, group_b)
     a = group_values(row, metadata, group_a)
 
@@ -134,6 +134,24 @@ def workbook_label(workbook):
     if isinstance(workbook, Path):
         return workbook.name
     return getattr(workbook, "name", "uploaded workbook")
+
+
+def workbook_bytes(workbook):
+    if isinstance(workbook, Path):
+        return workbook.read_bytes()
+    if hasattr(workbook, "getvalue"):
+        return workbook.getvalue()
+    return workbook.read()
+
+
+@st.cache_data(show_spinner=False)
+def workbook_sheet_names(data):
+    return pd.ExcelFile(BytesIO(data)).sheet_names
+
+
+@st.cache_data(show_spinner=False)
+def read_workbook_sheet(data, sheet_name):
+    return pd.read_excel(BytesIO(data), sheet_name=sheet_name, header=None)
 
 
 def clean_sample_name(value):
@@ -215,16 +233,11 @@ def build_metabolite_table(raw, sample_names, start_row, sample_cols):
     return metabolites
 
 
-def load_experiment(workbook, experiment_label):
-    if hasattr(workbook, "seek"):
-        workbook.seek(0)
-    excel = pd.ExcelFile(workbook)
-    sheet_names = excel.sheet_names
+def load_experiment(workbook_data, experiment_label):
+    sheet_names = workbook_sheet_names(workbook_data)
 
     if experiment_label == "SPF diet":
-        if hasattr(workbook, "seek"):
-            workbook.seek(0)
-        raw = pd.read_excel(workbook, sheet_name="SPF_diet", header=None)
+        raw = read_workbook_sheet(workbook_data, "SPF_diet")
         sample_cols = [
             col
             for col in range(2, 22)
@@ -239,9 +252,7 @@ def load_experiment(workbook, experiment_label):
         return raw, metadata, metabolites, sample_names, detect_unit(raw)
 
     sheet_name = "GF_14SM" if "GF_14SM" in sheet_names else 0
-    if hasattr(workbook, "seek"):
-        workbook.seek(0)
-    raw = pd.read_excel(workbook, sheet_name=sheet_name, header=None)
+    raw = read_workbook_sheet(workbook_data, sheet_name)
     sample_cols = list(range(2, 18))
     sample_names = [clean_sample_name(raw.iloc[4, col]) for col in sample_cols]
     metadata = build_gf_14sm_metadata(raw)
@@ -249,10 +260,8 @@ def load_experiment(workbook, experiment_label):
     return raw, metadata, metabolites, sample_names, detect_unit(raw)
 
 
-def available_experiments(workbook):
-    if hasattr(workbook, "seek"):
-        workbook.seek(0)
-    sheet_names = pd.ExcelFile(workbook).sheet_names
+def available_experiments(workbook_data):
+    sheet_names = workbook_sheet_names(workbook_data)
     experiments = ["GF / 14SM"]
     if "SPF_diet" in sheet_names:
         experiments.append("SPF diet")
@@ -299,7 +308,8 @@ elif uploaded is None:
     st.sidebar.info(f"Auto-loaded workbook: {workbook_label(workbook)}")
 
 try:
-    experiments = available_experiments(workbook)
+    data = workbook_bytes(workbook)
+    experiments = available_experiments(data)
 except Exception as exc:
     st.error(f"Could not read workbook '{workbook_label(workbook)}'.")
     st.exception(exc)
@@ -308,7 +318,7 @@ except Exception as exc:
 selected_experiment = st.sidebar.selectbox("Experiment", experiments)
 
 try:
-    raw, meta, met, sample_names, unit = load_experiment(workbook, selected_experiment)
+    raw, meta, met, sample_names, unit = load_experiment(data, selected_experiment)
 except Exception as exc:
     st.error(f"Could not load the '{selected_experiment}' experiment from '{workbook_label(workbook)}'.")
     st.exception(exc)
@@ -350,18 +360,20 @@ heatmap_top_n = st.sidebar.slider(
 )
 heatmap_log_transform = st.sidebar.checkbox(f"Heatmap log10({unit} + 1)", value=True)
 
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
-    [
-        "PCA",
-        "Metabolite Explorer",
-        "Heatmap",
-        "Volcano",
-        "Microbiota Effect",
-        "Diet Effect",
-    ]
-)
+views = [
+    "PCA",
+    "Metabolite Explorer",
+    "Heatmap",
+    "Volcano",
+    "Microbiota Effect",
+    "Diet Effect",
+]
+selected_view = st.sidebar.radio("View", views, key="selected_view")
 
-with tab1:
+if selected_view == "PCA":
+    from sklearn.decomposition import PCA
+    from sklearn.preprocessing import StandardScaler
+
     st.markdown(
         f"""
         PCA summarizes the overall metabolomics profile of each sample in two dimensions.
@@ -394,7 +406,7 @@ with tab1:
 
     st.plotly_chart(fig, use_container_width=True)
 
-with tab2:
+elif selected_view == "Metabolite Explorer":
     if filtered_meta.empty:
         st.warning("No samples match the selected colonization and diet filters.")
     else:
@@ -416,7 +428,7 @@ with tab2:
 
         st.plotly_chart(fig, use_container_width=True)
 
-with tab3:
+elif selected_view == "Heatmap":
     if filtered_meta.empty:
         st.warning("No samples match the selected colonization and diet filters.")
     else:
@@ -467,7 +479,7 @@ with tab3:
             st.plotly_chart(fig, use_container_width=True)
             st.dataframe(heat_z, use_container_width=True)
 
-with tab4:
+elif selected_view == "Volcano":
     if selected_experiment == "GF / 14SM":
         comparisons = GF_14SM_COMPARISONS
     else:
@@ -524,7 +536,7 @@ with tab4:
         mime="text/csv",
     )
 
-with tab5:
+elif selected_view == "Microbiota Effect":
     if selected_experiment != "GF / 14SM":
         st.info("Microbiota effect is only defined for the GF / 14SM experiment.")
     else:
@@ -573,7 +585,7 @@ with tab5:
             mime="text/csv",
         )
 
-with tab6:
+elif selected_view == "Diet Effect":
     if selected_experiment == "GF / 14SM":
         st.markdown(
             f"""
