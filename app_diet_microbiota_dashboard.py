@@ -360,17 +360,18 @@ heatmap_top_n = st.sidebar.slider(
 )
 heatmap_log_transform = st.sidebar.checkbox(f"Heatmap log10({unit} + 1)", value=True)
 
-views = [
-    "PCA",
-    "Metabolite Explorer",
-    "Heatmap",
-    "Volcano",
-    "Microbiota Effect",
-    "Diet Effect",
-]
-selected_view = st.sidebar.radio("View", views, key="selected_view")
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
+    [
+        "PCA",
+        "Metabolite Explorer",
+        "Heatmap",
+        "Volcano",
+        "Microbiota Effect",
+        "Diet Effect",
+    ]
+)
 
-if selected_view == "PCA":
+with tab1:
     from sklearn.decomposition import PCA
     from sklearn.preprocessing import StandardScaler
 
@@ -406,7 +407,7 @@ if selected_view == "PCA":
 
     st.plotly_chart(fig, use_container_width=True)
 
-elif selected_view == "Metabolite Explorer":
+with tab2:
     if filtered_meta.empty:
         st.warning("No samples match the selected colonization and diet filters.")
     else:
@@ -428,7 +429,7 @@ elif selected_view == "Metabolite Explorer":
 
         st.plotly_chart(fig, use_container_width=True)
 
-elif selected_view == "Heatmap":
+with tab3:
     if filtered_meta.empty:
         st.warning("No samples match the selected colonization and diet filters.")
     else:
@@ -479,7 +480,7 @@ elif selected_view == "Heatmap":
             st.plotly_chart(fig, use_container_width=True)
             st.dataframe(heat_z, use_container_width=True)
 
-elif selected_view == "Volcano":
+with tab4:
     if selected_experiment == "GF / 14SM":
         comparisons = GF_14SM_COMPARISONS
     else:
@@ -536,7 +537,7 @@ elif selected_view == "Volcano":
         mime="text/csv",
     )
 
-elif selected_view == "Microbiota Effect":
+with tab5:
     if selected_experiment != "GF / 14SM":
         st.info("Microbiota effect is only defined for the GF / 14SM experiment.")
     else:
@@ -585,7 +586,7 @@ elif selected_view == "Microbiota Effect":
             mime="text/csv",
         )
 
-elif selected_view == "Diet Effect":
+with tab6:
     if selected_experiment == "GF / 14SM":
         st.markdown(
             f"""
