@@ -392,7 +392,7 @@ with tab1:
     fig.update_xaxes(title=f"PC1 ({pca.explained_variance_ratio_[0] * 100:.1f}%)")
     fig.update_yaxes(title=f"PC2 ({pca.explained_variance_ratio_[1] * 100:.1f}%)")
 
-    st.plotly_chart(fig, width="stretch")
+    st.plotly_chart(fig, use_container_width=True)
 
 with tab2:
     if filtered_meta.empty:
@@ -414,7 +414,7 @@ with tab2:
         fig.update_traces(pointpos=0, jitter=0.25)
         fig.update_layout(yaxis_title=unit)
 
-        st.plotly_chart(fig, width="stretch")
+        st.plotly_chart(fig, use_container_width=True)
 
 with tab3:
     if filtered_meta.empty:
@@ -464,8 +464,8 @@ with tab3:
             )
             fig.update_layout(height=850)
 
-            st.plotly_chart(fig, width="stretch")
-            st.dataframe(heat_z, width="stretch")
+            st.plotly_chart(fig, use_container_width=True)
+            st.dataframe(heat_z, use_container_width=True)
 
 with tab4:
     if selected_experiment == "GF / 14SM":
@@ -512,10 +512,10 @@ with tab4:
     fig.add_vline(x=LOG2FC_THRESHOLD, line_dash="dash", line_color="gray")
     fig.add_hline(y=-np.log10(SIGNIFICANCE_Q), line_dash="dash", line_color="gray")
 
-    st.plotly_chart(fig, width="stretch")
+    st.plotly_chart(fig, use_container_width=True)
     st.dataframe(
         vol.sort_values(["q", "p"], na_position="last"),
-        width="stretch",
+        use_container_width=True,
     )
     st.download_button(
         "Download volcano results",
@@ -564,7 +564,7 @@ with tab5:
 
         st.dataframe(
             eff.sort_values("SC1_log2FC", ascending=False),
-            width="stretch",
+            use_container_width=True,
         )
         st.download_button(
             "Download microbiota effects",
@@ -643,18 +643,18 @@ with tab6:
         fig.add_hline(y=-LOG2FC_THRESHOLD, line_dash="dash", line_color="gray")
         fig.add_hline(y=LOG2FC_THRESHOLD, line_dash="dash", line_color="gray")
 
-        st.plotly_chart(fig, width="stretch")
+        st.plotly_chart(fig, use_container_width=True)
 
         st.dataframe(
             eff["Diet_response"].value_counts().reindex(response_order, fill_value=0)
             .rename_axis("Diet response")
             .reset_index(name="Metabolites"),
-            width="stretch",
+            use_container_width=True,
         )
 
         st.dataframe(
             eff.sort_values(["Diet_response", "GF_q", "14SM_q"], na_position="last"),
-            width="stretch",
+            use_container_width=True,
         )
         st.download_button(
             "Download diet effects",
@@ -703,10 +703,10 @@ with tab6:
             fig.add_vline(x=LOG2FC_THRESHOLD, line_dash="dash", line_color="gray")
             fig.add_hline(y=-np.log10(SIGNIFICANCE_Q), line_dash="dash", line_color="gray")
 
-            st.plotly_chart(fig, width="stretch")
+            st.plotly_chart(fig, use_container_width=True)
             st.dataframe(
                 eff.sort_values(["q", "p"], na_position="last"),
-                width="stretch",
+                use_container_width=True,
             )
             st.download_button(
                 "Download SPF diet effects",
