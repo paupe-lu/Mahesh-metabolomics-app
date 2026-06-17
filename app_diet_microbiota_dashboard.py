@@ -4,6 +4,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 import streamlit as st
 
 
@@ -354,11 +355,12 @@ heatmap_top_n = st.sidebar.slider(
     "Heatmap metabolites",
     min_value=10,
     max_value=min(150, len(met)),
-    value=min(50, len(met)),
+    value=min(30, len(met)),
     step=10,
     disabled=use_all_heatmap_metabolites,
 )
 heatmap_log_transform = st.sidebar.checkbox(f"Heatmap log10({unit} + 1)", value=True)
+show_heatmap_values = st.sidebar.checkbox("Show heatmap values table", value=False)
 
 tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
     [
@@ -433,52 +435,67 @@ with tab3:
     if filtered_meta.empty:
         st.warning("No samples match the selected colonization and diet filters.")
     else:
-        heat_samples = filtered_meta["Sample"].tolist()
-        heat_matrix = met.set_index("Metabolite")[heat_samples].copy()
+        with st.spinner("Building heatmap..."):
+            heat_samples = filtered_meta["Sample"].tolist()
+            heat_matrix = met.set_index("Metabolite")[heat_samples].copy()
 
-        if heatmap_log_transform:
-            heat_matrix = np.log10(heat_matrix + 1)
+            if heatmap_log_transform:
+                heat_matrix = np.log10(heat_matrix + 1)
 
-        if len(heat_samples) < 2:
-            st.warning("Select at least two samples for the heatmap.")
-        elif heat_matrix.dropna(how="all").empty:
-            st.warning("No metabolite values are available for the selected samples.")
-        elif use_all_heatmap_metabolites:
-            displayed_metabolites = heat_matrix.index
-            heatmap_title = "All metabolites"
-        else:
-            variances = heat_matrix.var(axis=1).sort_values(ascending=False)
-            displayed_metabolites = variances.head(heatmap_top_n).index
-            heatmap_title = f"Top {len(displayed_metabolites)} variable metabolites"
+            if len(heat_samples) < 2:
+                st.warning("Select at least two samples for the heatmap.")
+            elif heat_matrix.dropna(how="all").empty:
+                st.warning("No metabolite values are available for the selected samples.")
+            else:
+                variances = heat_matrix.var(axis=1).sort_values(ascending=False)
+                if use_all_heatmap_metabolites:
+                    max_heatmap_metabolites = 300
+                    displayed_metabolites = variances.head(max_heatmap_metabolites).index
+                    heatmap_title = f"Top {len(displayed_metabolites)} variable metabolites"
+                    if len(variances) > max_heatmap_metabolites:
+                        st.info(
+                            f"Showing the top {max_heatmap_metabolites} variable metabolites "
+                            "to keep the browser responsive."
+                        )
+                else:
+                    displayed_metabolites = variances.head(heatmap_top_n).index
+                    heatmap_title = f"Top {len(displayed_metabolites)} variable metabolites"
 
-        if len(heat_samples) >= 2 and not heat_matrix.dropna(how="all").empty:
-            heat = heat_matrix.loc[displayed_metabolites]
-            heat_z = heat.sub(heat.mean(axis=1), axis=0).div(heat.std(axis=1), axis=0)
-            heat_z = heat_z.replace([np.inf, -np.inf], np.nan).fillna(0)
-            color_limit = float(np.nanmax(np.abs(heat_z.to_numpy())))
-            if color_limit == 0 or np.isnan(color_limit):
-                color_limit = 1.0
+                heat = heat_matrix.loc[displayed_metabolites]
+                heat_z = heat.sub(heat.mean(axis=1), axis=0).div(heat.std(axis=1), axis=0)
+                heat_z = heat_z.replace([np.inf, -np.inf], np.nan).fillna(0)
+                color_limit = float(np.nanmax(np.abs(heat_z.to_numpy())))
+                if color_limit == 0 or np.isnan(color_limit):
+                    color_limit = 1.0
 
-            sample_labels = filtered_meta.set_index("Sample").loc[heat_samples].apply(
-                lambda r: f"{r.name} | {r['Group']}",
-                axis=1,
-            )
-            heat_z.columns = sample_labels.tolist()
+                sample_labels = filtered_meta.set_index("Sample").loc[heat_samples].apply(
+                    lambda r: f"{r.name} | {r['Group']}",
+                    axis=1,
+                )
+                heat_z.columns = sample_labels.tolist()
 
-            fig = px.imshow(
-                heat_z,
-                aspect="auto",
-                color_continuous_scale="RdBu_r",
-                zmin=-color_limit,
-                zmax=color_limit,
-                color_continuous_midpoint=0,
-                labels={"x": "Sample", "y": "Metabolite", "color": "Row z-score"},
-                title=heatmap_title,
-            )
-            fig.update_layout(height=850)
+                fig = go.Figure(
+                    data=go.Heatmap(
+                        z=heat_z.to_numpy(),
+                        x=heat_z.columns.tolist(),
+                        y=heat_z.index.astype(str).tolist(),
+                        zmin=-color_limit,
+                        zmax=color_limit,
+                        colorscale="RdBu",
+                        reversescale=True,
+                        colorbar={"title": "Row z-score"},
+                    )
+                )
+                fig.update_layout(
+                    title=heatmap_title,
+                    height=min(900, max(450, len(heat_z) * 18)),
+                    xaxis_title="Sample",
+                    yaxis_title="Metabolite",
+                )
 
-            st.plotly_chart(fig, use_container_width=True)
-            st.dataframe(heat_z, use_container_width=True)
+                st.plotly_chart(fig, use_container_width=True)
+                if show_heatmap_values:
+                    st.dataframe(heat_z, use_container_width=True)
 
 with tab4:
     if selected_experiment == "GF / 14SM":
